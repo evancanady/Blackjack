@@ -1,6 +1,7 @@
 import os
 import random
 
+#this is new
 
 deck_count = 2
 num_players = 3
