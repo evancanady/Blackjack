@@ -4,26 +4,31 @@ import random
 #this is new
 #so is this
 
-deck_count = 2
+deck_count = 1
 num_players = 3
-num_hands = 1000
+num_hands_per_tourney = 10
+num_tournys = 1
 cut_cards = True
-reshuffle = False
 dealer_hit_to = 17
+dealer_bust = False
 
 class Player():
-	def __init__(self, name, strategy):
+	def __init__(self,name, strategy, hit_to):
 		self.name = name
 		self.strategy = strategy
-		self.hit_to = 17
-		self.hands = []
-		self.totals = []
-		self.actions = {0: None}
-		self.results = {0: True}
-		self.actives = {0: True}
-	@property
-	def num_hands(self):
-		return int(sum([len(item) for item in self.hands])/2) #2 cards per hand initially, so card-count / 2 = hand count
+		self.hit_to = hit_to
+		self.data = {0:{'cards': [], 'total': 0, 'result': None, 'bust': False}}
+		self.num_hands = len(self.data)
+# turn this back on if num_shoes does not work
+#	@property
+#	def num_hands(self):
+#		return len(self.data)
+
+class Dealer():
+	def __init__(self, hit_to):
+		self.hit_to = hit_to
+		self.data = {'cards': [], 'total': 0, 'result': None, 'bust': False}
+#		self.num_hands = 1
 	
 
 def shuffle(deck_count, cut):
@@ -37,23 +42,26 @@ def shuffle(deck_count, cut):
 		cut_placement = random.randint(cut_placement_min, cut_placement_max)
 		deck.insert(cut_placement, 'CUT')
 
+	global reshuffle
+	reshuffle = False
+
 	return deck
 
-def deal(shuffled_deck, players, dealer_hand):
+def deal(shuffled_deck, players, the_dealer, reshuffle):
 	for i in range(2):
 		for p in players:
-			if shuffled_deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
-				deck.pop()
-				global reshuffle
-				reshuffle = True
-			p.hands.append(shuffled_deck.pop()) # deal one card to each player, then one to dealer and repeat once to have two cards each
-		dealer_hand.append(shuffled_deck.pop())	
-	for p in players:
-		p.hands = [p.hands]
-		p.actives = [True]
-	dealer_hand = [dealer_hand]
+			for h in range(p.num_hands):
+				if shuffled_deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
+					shuffled_deck.pop()
+					reshuffle = True
+				p.data[h]['cards'].append(shuffled_deck.pop()) # deal one card to each player, then one to dealer and repeat once to have two cards each
+		
+		if shuffled_deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
+			shuffled_deck.pop()
+			reshuffle = True
+		the_dealer.data['cards'].append(shuffled_deck.pop())	
 	
-	return shuffled_deck, players, dealer_hand
+	return shuffled_deck, players, the_dealer, reshuffle
 
 
 def hit(hand, deck):
@@ -61,136 +69,112 @@ def hit(hand, deck):
 	hand.append(deck.pop())
 	return hand, deck
 
-def blackjack(players, dealer_hand):
-	dealer_total = total(dealer_hand)
-
+def blackjack_check(players, the_dealer):
 	for p in players:
-		player_total = total(p.hand)
-		
-		if player_total == 21 and dealer_total < 21:
-			p.score = player_total
-			p.result = 'blackjack'
-			p.active = False
-		elif player_total < 21 and dealer_total == 21:
-			p.total = player_total
-			p.result = 'beaten by dealer'
-			p.active = False
-		elif player_total == 21 and dealer_total == 21:
-			p.total = player_total
-			p.result = 'push'
-			p.active = False
+		for h in range(p.num_hands):
+			if the_dealer.data['total'] == 21 and p.data[h]['total'] < 21:
+				p.data[h]['result'] = 'lose'
+				p.data[h]['active'] = False
+			elif the_dealer.data['total'] == 21 and p.data[h]['total'] == 21:
+				p.data[h]['result'] = 'push'
+				p.data[h]['active'] = False
+	return players
 
-	return players, dealer_hand
-
-def total(hands):
-    totals = []
-    hand_count = len(hands)
-    for hand in range(hand_count):
-        total = 0
-        for card in range(len(hands[hand])):
-            if hands[hand][card] == 'J' or hands[hand][card] == 'Q' or hands[hand][card] == 'K':
-                total += 10
-            elif str(hands[hand][card]).isnumeric() == True:
-                total += hands[hand][card]
-            else:
-                if total >= 11:
-                    total +=1
-                else:
-                	total += 11
-        totals.append(total)
-    return totals
-
+def total(hands): #need to account for situation where A needs to be 1 after hit. ex: A, 2 + 10
+	total = [0,0]
+	for card in hands:
+		if card == 'J' or card == 'Q' or card == 'K':
+			total[0] += 10
+			total[1] += 10
+		elif str(card).isnumeric() == True:
+			total[0] += card
+			total[1] += card
+		else:
+			total[0] += 1
+			total[1] += 11
+	if total[0] == total[1]: return total[0]
+	elif max(total[0], total[1]) <= 21: return max(total[0], total[1])
+	else:
+		return min(total[0], total[1])
 
 
 def game():
 	round_counter = 0
 	used_cards = 0
+	reshuffle = False
 
-	players = []
-	strat = 'stict'
-
-	for n in range(num_players):
-		name = 'Bot' + str(n+1)
-		players.append(Player(name, strat))
-
+	# shuffle the deck(s)
 	shuffled_deck = shuffle(deck_count, cut_cards)
 
-	#print(len(shuffled_deck)-1)
 
-	dealer_hand = []
+	while round_counter < num_hands_per_tourney:
+		if reshuffle:
+			shuffled_deck = shuffle(deck_count, cut_cards)
 
-	shuffled_deck, players, dealer_hand = deal(shuffled_deck, players, dealer_hand)
+		players = []
+		strat = 'stict'
 
-	
+		for n in range(num_players):
+			name = 'Bot' + str(n+1)
+			players.append(Player(name, strat, 17))
 
-	for p in players:
-		p.totals = total(p.hands)
-		for i in range(p.num_hands):
-			print(p.name)
-			print(p.hands[i])
-			print(p.totals[i])
-	print('dealer')
-	print(dealer_hand[i])
-	dealer_total = total(dealer_hand)
-	print(dealer_total)
+		the_dealer = Dealer(dealer_hit_to)
 
-	print('##############################################')
+		# print('cards remaining:')
+		# print(len(shuffled_deck))
+		# print(reshuffle)
+		# print(shuffled_deck)
 
-
-	#dealer_total = total(dealer_hand)
-
-	for p in players:
-		p.totals = total(p.hands)
-		for i in range(p.num_hands):
-			while p.actives[i] != False:
-				if dealer_total == 21 and p.totals[i] < 21:
-					p.results[i] = 'lose - delear 21'
-					p.actives[i] = False
-				elif dealer_total == 21 and p.totals[i] == 21:
-					p.results[i] = 'push'
-					p.actives[i] = False
-				elif p.totals[i] > 21:
-					p.results[i] = 'bust'
-					p.actives[i] = False
-				elif p.totals[i] >= p.hit_to:
-					p.actives[i] = False
-				elif p.totals[i] < p.hit_to:
-					p.hands[i], shuffled_deck = hit(p.hands[i], shuffled_deck)
-				p.totals = total(p.hands)
-
-	while dealer_total < 17:
-		dealer_hand, shuffled_deck = hit(dealer_hand, shuffled_deck)
-
-	for p in players:
-		p.totals = total(p.hands)
-		for i in range(p.num_hands):
-			print(p.name)
-			print(p.hands[i])
-			print(p.totals[i])
-			print(p.results[i])
-	print('dealer')
-	print(dealer_hand[i])
-	dealer_total = total(dealer_hand)
-	print(dealer_total)
-
-	print('##############################################')
-					
+		# deal the cards
+		shuffled_deck, players, the_dealer, reshuffle = deal(shuffled_deck, players, the_dealer, reshuffle)
 
 
+		# calculate hand totals
+		for p in players:
+			for h in range(p.num_hands):
+				p.data[h]['total'] = total(p.data[h]['cards'])
+		the_dealer.data['total'] = total(the_dealer.data['cards'])
+
+
+		# check for dealer blackjack
+		players = blackjack_check(players, the_dealer)
+
+		# hit player hands while total < hit_to target
+		for p in players:
+			for h in range(p.num_hands):
+				while p.data[h]['total'] < p.hit_to:
+					p.data[h]['cards'], shuffled_deck = hit(p.data[h]['cards'], shuffled_deck)
+					p.data[h]['total'] = total(p.data[h]['cards'])
+					if p.data[h]['total'] > 21: p.data[h]['bust'] = True
+
+
+		# hit dealer hand while total < hit_to target
+		while the_dealer.data['total'] < dealer_hit_to:
+			the_dealer.data['cards'], shuffled_deck = hit(the_dealer.data['cards'], shuffled_deck)
+			the_dealer.data['total'] = total(the_dealer.data['cards'])
+			if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
+
+		for p in players:
+			for h in range(p.num_hands):
+				if p.data[h]['bust']:
+					p.data[h]['result'] = 'lose'
+				elif the_dealer.data['bust']:
+					p.data[h]['result'] = 'win'
+				elif p.data[h]['total'] > the_dealer.data['total']:
+					p.data[h]['result'] = 'win'
+				elif p.data[h]['total'] < the_dealer.data['total']:
+					p.data[h]['result'] = 'lose'
+				elif p.data[h]['total'] == the_dealer.data['total']:
+					p.data[h]['result'] = 'push'
+				print(p.name)
+				print(p.data)
 		
 
+		# print('dealer')
+		# print(the_dealer.data)
 
-	# for p in players:
-	# 	for i in range(p.num_hands):
-	# 		p.total
-
-	# if total(dealer_hand) == 21:
-	# 	for p in players:
-	# 		if p.
-
-
-
-
+		round_counter += 1
+		# print(round_counter)
 
 if __name__ == "__main__":
 	game()
