@@ -6,7 +6,7 @@ import random
 
 deck_count = 1
 num_players = 3
-num_hands_per_tourney = 10
+num_hands_per_tourney = 500
 num_tournys = 1
 cut_cards = True
 dealer_hit_to = 17
@@ -51,6 +51,7 @@ def deal(shuffled_deck, players, the_dealer, reshuffle):
 	for i in range(2):
 		for p in players:
 			for h in range(p.num_hands):
+				print(shuffled_deck) # debugging
 				if shuffled_deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
 					shuffled_deck.pop()
 					reshuffle = True
@@ -64,10 +65,13 @@ def deal(shuffled_deck, players, the_dealer, reshuffle):
 	return shuffled_deck, players, the_dealer, reshuffle
 
 
-def hit(hand, deck):
+def hit(hand, deck, reshuffle):
 	#print(deck) #debug
+	if deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
+		deck.pop()
+		reshuffle = True
 	hand.append(deck.pop())
-	return hand, deck
+	return hand, deck, reshuffle
 
 def blackjack_check(players, the_dealer):
 	for p in players:
@@ -143,14 +147,14 @@ def game():
 		for p in players:
 			for h in range(p.num_hands):
 				while p.data[h]['total'] < p.hit_to:
-					p.data[h]['cards'], shuffled_deck = hit(p.data[h]['cards'], shuffled_deck)
+					p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
 					p.data[h]['total'] = total(p.data[h]['cards'])
 					if p.data[h]['total'] > 21: p.data[h]['bust'] = True
 
 
 		# hit dealer hand while total < hit_to target
 		while the_dealer.data['total'] < dealer_hit_to:
-			the_dealer.data['cards'], shuffled_deck = hit(the_dealer.data['cards'], shuffled_deck)
+			the_dealer.data['cards'], shuffled_deck, reshuffle = hit(the_dealer.data['cards'], shuffled_deck, reshuffle)
 			the_dealer.data['total'] = total(the_dealer.data['cards'])
 			if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
 
@@ -166,8 +170,8 @@ def game():
 					p.data[h]['result'] = 'lose'
 				elif p.data[h]['total'] == the_dealer.data['total']:
 					p.data[h]['result'] = 'push'
-				print(p.name)
-				print(p.data)
+				# print(p.name)
+				# print(p.data)
 		
 
 		# print('dealer')
@@ -175,6 +179,7 @@ def game():
 
 		round_counter += 1
 		# print(round_counter)
+		# print(shuffled_deck)
 
 if __name__ == "__main__":
 	game()
