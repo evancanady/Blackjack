@@ -1,5 +1,6 @@
 import os
 import random
+import pandas as pd
 
 #this is new
 #so is this
@@ -17,7 +18,7 @@ class Player():
 		self.name = name
 		self.strategy = strategy
 		self.hit_to = hit_to
-		self.data = {0:{'cards': [], 'total': 0, 'result': None, 'bust': False}}
+		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'cards': []}}
 		self.num_hands = len(self.data)
 # turn this back on if num_shoes does not work
 #	@property
@@ -27,7 +28,7 @@ class Player():
 class Dealer():
 	def __init__(self, hit_to):
 		self.hit_to = hit_to
-		self.data = {'cards': [], 'total': 0, 'result': None, 'bust': False}
+		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'cards': []}
 #		self.num_hands = 1
 	
 
@@ -51,7 +52,7 @@ def deal(shuffled_deck, players, the_dealer, reshuffle):
 	for i in range(2):
 		for p in players:
 			for h in range(p.num_hands):
-				print(shuffled_deck) # debugging
+				# print(shuffled_deck) # debugging
 				if shuffled_deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
 					shuffled_deck.pop()
 					reshuffle = True
@@ -78,10 +79,10 @@ def blackjack_check(players, the_dealer):
 		for h in range(p.num_hands):
 			if the_dealer.data['total'] == 21 and p.data[h]['total'] < 21:
 				p.data[h]['result'] = 'lose'
-				p.data[h]['active'] = False
+				# p.data[h]['active'] = False
 			elif the_dealer.data['total'] == 21 and p.data[h]['total'] == 21:
 				p.data[h]['result'] = 'push'
-				p.data[h]['active'] = False
+				# p.data[h]['active'] = False
 	return players
 
 def total(hands): #need to account for situation where A needs to be 1 after hit. ex: A, 2 + 10
@@ -106,6 +107,8 @@ def game():
 	round_counter = 0
 	used_cards = 0
 	reshuffle = False
+	df = pd.DataFrame()
+
 
 	# shuffle the deck(s)
 	shuffled_deck = shuffle(deck_count, cut_cards)
@@ -170,16 +173,25 @@ def game():
 					p.data[h]['result'] = 'lose'
 				elif p.data[h]['total'] == the_dealer.data['total']:
 					p.data[h]['result'] = 'push'
+				
+				temp_df = pd.DataFrame.from_dict(p.data[h], orient='index').swapaxes('index','columns')
+				temp_df['round'] = round_counter
+				df = df.append(temp_df)
+				# print(temp_df)
 				# print(p.name)
-				# print(p.data)
+				# print(p.data[h])
 		
-
-		# print('dealer')
+		temp_df = pd.DataFrame.from_dict(the_dealer.data, orient='index').swapaxes('index','columns')
+		temp_df['round'] = round_counter
+		df = df.append(temp_df)
+		# print('dealer')	
 		# print(the_dealer.data)
 
 		round_counter += 1
 		# print(round_counter)
 		# print(shuffled_deck)
+	df.reset_index(inplace=True, drop=True)
+	print(df.head(20))
 
 if __name__ == "__main__":
 	game()
