@@ -1,6 +1,7 @@
 import os
 import random
 import pandas as pd
+import pickle
 
 #this is new
 #so is this
@@ -8,7 +9,7 @@ import pandas as pd
 deck_count = 1
 num_players = 3
 num_hands_per_tourney = 500
-num_tournys = 1
+num_tourneys = 1
 cut_cards = True
 dealer_hit_to = 17
 dealer_bust = False
@@ -118,11 +119,12 @@ def game():
 		if reshuffle:
 			shuffled_deck = shuffle(deck_count, cut_cards)
 
+		# list to hold player objects
 		players = []
 		strat = 'stict'
 
 		for n in range(num_players):
-			name = 'Bot' + str(n+1)
+			name = 'Player' + str(n+1)
 			players.append(Player(name, strat, 17))
 
 		the_dealer = Dealer(dealer_hit_to)
@@ -174,24 +176,29 @@ def game():
 				elif p.data[h]['total'] == the_dealer.data['total']:
 					p.data[h]['result'] = 'push'
 				
+				# write each player's data to a dataframe
 				temp_df = pd.DataFrame.from_dict(p.data[h], orient='index').swapaxes('index','columns')
 				temp_df['round'] = round_counter
+				temp_df['hand'] = h
 				df = df.append(temp_df)
-				# print(temp_df)
-				# print(p.name)
-				# print(p.data[h])
 		
+		# write dealer's data to dataframe
 		temp_df = pd.DataFrame.from_dict(the_dealer.data, orient='index').swapaxes('index','columns')
 		temp_df['round'] = round_counter
+		temp_df['hand'] = 0
 		df = df.append(temp_df)
-		# print('dealer')	
-		# print(the_dealer.data)
 
+		
 		round_counter += 1
 		# print(round_counter)
 		# print(shuffled_deck)
+
 	df.reset_index(inplace=True, drop=True)
-	print(df.head(20))
+	# print(df.head(20))
+	outfile = open('blackjack.pickle','wb')
+	pickle.dump(df,outfile)
+	outfile.close()
+	print('Done!')
 
 if __name__ == "__main__":
 	game()
