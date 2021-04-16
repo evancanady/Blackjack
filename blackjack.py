@@ -3,17 +3,6 @@ import random
 import pandas as pd
 import pickle
 
-#this is new
-#so is this
-
-deck_count = 1
-num_players = 3
-num_hands_per_tourney = 500
-num_tourneys = 1
-cut_cards = True
-dealer_hit_to = 17
-dealer_bust = False
-
 class Player():
 	def __init__(self,name, strategy, hit_to):
 		self.name = name
@@ -104,10 +93,11 @@ def total(hands): #need to account for situation where A needs to be 1 after hit
 		return min(total[0], total[1])
 
 
-def game():
+def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to):
 	round_counter = 0
 	used_cards = 0
 	reshuffle = False
+	dealer_bust = False
 	df = pd.DataFrame()
 
 
@@ -147,6 +137,8 @@ def game():
 
 		# check for dealer blackjack
 		players = blackjack_check(players, the_dealer)
+		# need to modify so this actually does something
+
 
 		# hit player hands while total < hit_to target
 		for p in players:
@@ -201,7 +193,16 @@ def game():
 	print('Done!')
 
 if __name__ == "__main__":
-	game()
+	deck_count = 1
+	num_players = 3
+	num_hands_per_tourney = 500
+	num_tourneys = 1
+	cut_cards = True
+	dealer_hit_to = 17
+	
+
+	game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to)
+
 
 
 
