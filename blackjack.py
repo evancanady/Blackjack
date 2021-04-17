@@ -88,14 +88,14 @@ def total(hands):
 		return min(total[0], total[1])
 
 
-def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to):
+def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to, test_string='default'):
 	round_counter = 0
 	used_cards = 0
 	reshuffle = False
 	dealer_bust = False
 	df = pd.DataFrame()
 
-	print('Go!')
+	print(test_string)
 
 
 	# shuffle the deck(s)
