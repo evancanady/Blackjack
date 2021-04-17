@@ -1,4 +1,4 @@
-import os
+# import os
 import random
 import pandas as pd
 import pickle
@@ -8,20 +8,14 @@ class Player():
 		self.name = name
 		self.strategy = strategy
 		self.hit_to = hit_to
-		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'cards': []}}
+		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': []}}
 		self.num_hands = len(self.data)
-# turn this back on if num_shoes does not work
-#	@property
-#	def num_hands(self):
-#		return len(self.data)
 
 class Dealer():
 	def __init__(self, hit_to):
 		self.hit_to = hit_to
-		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'cards': []}
-#		self.num_hands = 1
+		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': []}
 	
-
 def shuffle(deck_count, cut):
 	deck = [2,3,4,5,6,7,8,9,10,'J','Q','K','A'] * 4 * deck_count # four cards of each suit
 
@@ -65,17 +59,18 @@ def hit(hand, deck, reshuffle):
 	return hand, deck, reshuffle
 
 def blackjack_check(players, the_dealer):
-	for p in players:
-		for h in range(p.num_hands):
-			if the_dealer.data['total'] == 21 and p.data[h]['total'] < 21:
-				p.data[h]['result'] = 'lose'
-				# p.data[h]['active'] = False
-			elif the_dealer.data['total'] == 21 and p.data[h]['total'] == 21:
-				p.data[h]['result'] = 'push'
-				# p.data[h]['active'] = False
-	return players
+	if the_dealer.data['total'] == 21:
+		the_dealer.data['blackjack'] = True
+		for p in players:
+			for h in range(p.num_hands):
+				if p.data[h]['total'] < 21:
+					p.data[h]['result'] = 'lose'
+				elif p.data[h]['total'] == 21:
+					p.data[h]['result'] = 'push'
+					p.data[h]['blackjack'] = True
+	return players, the_dealer
 
-def total(hands): #need to account for situation where A needs to be 1 after hit. ex: A, 2 + 10
+def total(hands):
 	total = [0,0]
 	for card in hands:
 		if card == 'J' or card == 'Q' or card == 'K':
@@ -100,6 +95,8 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 	dealer_bust = False
 	df = pd.DataFrame()
 
+	print('Go!')
+
 
 	# shuffle the deck(s)
 	shuffled_deck = shuffle(deck_count, cut_cards)
@@ -119,14 +116,8 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 
 		the_dealer = Dealer(dealer_hit_to)
 
-		# print('cards remaining:')
-		# print(len(shuffled_deck))
-		# print(reshuffle)
-		# print(shuffled_deck)
-
 		# deal the cards
 		shuffled_deck, players, the_dealer, reshuffle = deal(shuffled_deck, players, the_dealer, reshuffle)
-
 
 		# calculate hand totals
 		for p in players:
@@ -136,37 +127,38 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 
 
 		# check for dealer blackjack
-		players = blackjack_check(players, the_dealer)
-		# need to modify so this actually does something
+		players, the_dealer = blackjack_check(players, the_dealer)
+		
+
+		if the_dealer.data['blackjack'] == False:
+			# hit player hands while total < hit_to target
+			for p in players:
+				for h in range(p.num_hands):
+					while p.data[h]['total'] < p.hit_to:
+						p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
+						p.data[h]['total'] = total(p.data[h]['cards'])
+						if p.data[h]['total'] > 21: p.data[h]['bust'] = True
 
 
-		# hit player hands while total < hit_to target
+			# hit dealer hand while total < hit_to target
+			while the_dealer.data['total'] < dealer_hit_to:
+				the_dealer.data['cards'], shuffled_deck, reshuffle = hit(the_dealer.data['cards'], shuffled_deck, reshuffle)
+				the_dealer.data['total'] = total(the_dealer.data['cards'])
+				if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
+
 		for p in players:
 			for h in range(p.num_hands):
-				while p.data[h]['total'] < p.hit_to:
-					p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
-					p.data[h]['total'] = total(p.data[h]['cards'])
-					if p.data[h]['total'] > 21: p.data[h]['bust'] = True
-
-
-		# hit dealer hand while total < hit_to target
-		while the_dealer.data['total'] < dealer_hit_to:
-			the_dealer.data['cards'], shuffled_deck, reshuffle = hit(the_dealer.data['cards'], shuffled_deck, reshuffle)
-			the_dealer.data['total'] = total(the_dealer.data['cards'])
-			if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
-
-		for p in players:
-			for h in range(p.num_hands):
-				if p.data[h]['bust']:
-					p.data[h]['result'] = 'lose'
-				elif the_dealer.data['bust']:
-					p.data[h]['result'] = 'win'
-				elif p.data[h]['total'] > the_dealer.data['total']:
-					p.data[h]['result'] = 'win'
-				elif p.data[h]['total'] < the_dealer.data['total']:
-					p.data[h]['result'] = 'lose'
-				elif p.data[h]['total'] == the_dealer.data['total']:
-					p.data[h]['result'] = 'push'
+				if the_dealer.data['blackjack'] == False:
+					if p.data[h]['bust']:
+						p.data[h]['result'] = 'lose'
+					elif the_dealer.data['bust']:
+						p.data[h]['result'] = 'win'
+					elif p.data[h]['total'] > the_dealer.data['total']:
+						p.data[h]['result'] = 'win'
+					elif p.data[h]['total'] < the_dealer.data['total']:
+						p.data[h]['result'] = 'lose'
+					elif p.data[h]['total'] == the_dealer.data['total']:
+						p.data[h]['result'] = 'push'
 				
 				# write each player's data to a dataframe
 				temp_df = pd.DataFrame.from_dict(p.data[h], orient='index').swapaxes('index','columns')
