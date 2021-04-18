@@ -1,20 +1,20 @@
-# import os
+import sys
 import random
 import pandas as pd
 import pickle
 
 class Player():
-	def __init__(self,name, strategy, hit_to):
+	def __init__(self,name, strategy, hit_strategy):
 		self.name = name
 		self.strategy = strategy
-		self.hit_to = hit_to
-		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': []}}
+		# self.hit_to = hit_to
+		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0}}
 		self.num_hands = len(self.data)
 
 class Dealer():
 	def __init__(self, hit_to):
-		self.hit_to = hit_to
-		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': []}
+		# self.hit_to = hit_to
+		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0}
 	
 def shuffle(deck_count, cut):
 	deck = [2,3,4,5,6,7,8,9,10,'J','Q','K','A'] * 4 * deck_count # four cards of each suit
@@ -88,21 +88,22 @@ def total(hands):
 		return min(total[0], total[1])
 
 
-def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to, test_string='default'):
+def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_strategies):
 	round_counter = 0
 	used_cards = 0
 	reshuffle = False
 	dealer_bust = False
 	df = pd.DataFrame()
 
-	print(test_string)
+	if len(hit_strategies) != num_players:
+		sys.exit('num_players must equal len(hit_strategies)')
 
 
 	# shuffle the deck(s)
 	shuffled_deck = shuffle(deck_count, cut_cards)
 
 
-	while round_counter < num_hands_per_tourney:
+	while round_counter < num_rounds:
 		if reshuffle:
 			shuffled_deck = shuffle(deck_count, cut_cards)
 
@@ -112,19 +113,29 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 
 		for n in range(num_players):
 			name = 'Player' + str(n+1)
-			players.append(Player(name, strat, 17))
+			players.append(Player(name, strat, hit_strategies[n]))
+
+		# print(hit_strategies)
+		# print(players[0].data[0]['hit_strategy'])
 
 		the_dealer = Dealer(dealer_hit_to)
 
 		# deal the cards
 		shuffled_deck, players, the_dealer, reshuffle = deal(shuffled_deck, players, the_dealer, reshuffle)
 
-		# calculate hand totals
+		# calculate hand totals and assign dealer up card
+		the_dealer.data['total'] = total(the_dealer.data['cards'])
+
+		dealer_up = the_dealer.data['cards'][0]
+		if dealer_up == 'A' or dealer_up == 'K' or dealer_up == 'Q' or dealer_up == 'J':
+			dealer_up = 10
+
+		the_dealer.data['dealer_up_card'] = dealer_up
+
 		for p in players:
 			for h in range(p.num_hands):
 				p.data[h]['total'] = total(p.data[h]['cards'])
-		the_dealer.data['total'] = total(the_dealer.data['cards'])
-
+				p.data[h]['dealer_up_card'] = dealer_up
 
 		# check for dealer blackjack
 		players, the_dealer = blackjack_check(players, the_dealer)
@@ -134,14 +145,14 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 			# hit player hands while total < hit_to target
 			for p in players:
 				for h in range(p.num_hands):
-					while p.data[h]['total'] < p.hit_to:
+					while p.data[h]['total'] < p.data[h]['hit_strategy'][dealer_up]:
 						p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
 						p.data[h]['total'] = total(p.data[h]['cards'])
 						if p.data[h]['total'] > 21: p.data[h]['bust'] = True
 
 
 			# hit dealer hand while total < hit_to target
-			while the_dealer.data['total'] < dealer_hit_to:
+			while the_dealer.data['total'] < the_dealer.data['hit_strategy']:
 				the_dealer.data['cards'], shuffled_deck, reshuffle = hit(the_dealer.data['cards'], shuffled_deck, reshuffle)
 				the_dealer.data['total'] = total(the_dealer.data['cards'])
 				if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
@@ -187,13 +198,16 @@ def game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards
 if __name__ == "__main__":
 	deck_count = 1
 	num_players = 3
-	num_hands_per_tourney = 500
-	num_tourneys = 1
+	num_rounds = 500
 	cut_cards = True
 	dealer_hit_to = 17
+	# format of hit_strategies dict: {player: {dealer_up_card: player_hit_to}}
+	hit_strategies = {0: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17},
+				      1: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17},
+				      2: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17}}
 	
 
-	game(deck_count, num_players, num_hands_per_tourney, num_tourneys, cut_cards, dealer_hit_to)
+	game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_strategies)
 
 
 
