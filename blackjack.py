@@ -4,17 +4,26 @@ import pandas as pd
 import pickle
 
 class Player():
-	def __init__(self,name, strategy, hit_strategy):
+	def __init__(self, name, hit_strategy):
 		self.name = name
-		self.strategy = strategy
 		# self.hit_to = hit_to
-		self.data = {0:{'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0}}
-		self.num_hands = len(self.data)
+		self.data = {0:{'active': True, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0},
+					 1:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0},
+					 2:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0}}
+		# self.num_hands = len(self.data)
+
+	@property
+	def num_hands(self):
+		active_count = 0
+		for key, value in self.data.items():
+			if value['active'] == True: active_count += 1
+		return active_count
+		
 
 class Dealer():
 	def __init__(self, hit_to):
 		# self.hit_to = hit_to
-		self.data = {'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0}
+		self.data = {'active': True, 'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0}
 	
 def shuffle(deck_count, cut):
 	deck = [2,3,4,5,6,7,8,9,10,'J','Q','K','A'] * 4 * deck_count # four cards of each suit
@@ -95,8 +104,12 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 	dealer_bust = False
 	df = pd.DataFrame()
 
+	# validate 
 	if len(hit_strategies) != num_players:
 		sys.exit('num_players must equal len(hit_strategies)')
+
+	# read split strategies into dataframe
+	split_df = pd.read_csv('split_strategy.csv').set_index('0')
 
 
 	# shuffle the deck(s)
@@ -109,11 +122,10 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 
 		# list to hold player objects
 		players = []
-		strat = 'stict'
 
 		for n in range(num_players):
 			name = 'Player' + str(n+1)
-			players.append(Player(name, strat, hit_strategies[n]))
+			players.append(Player(name, hit_strategies[n]))
 
 		# print(hit_strategies)
 		# print(players[0].data[0]['hit_strategy'])
@@ -127,8 +139,9 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 		the_dealer.data['total'] = total(the_dealer.data['cards'])
 
 		dealer_up = the_dealer.data['cards'][0]
-		if dealer_up == 'A' or dealer_up == 'K' or dealer_up == 'Q' or dealer_up == 'J':
+		if dealer_up == 'K' or dealer_up == 'Q' or dealer_up == 'J':
 			dealer_up = 10
+		elif dealer_up == 'A': dealer_up = 11
 
 		the_dealer.data['dealer_up_card'] = dealer_up
 
@@ -142,9 +155,22 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 		
 
 		if the_dealer.data['blackjack'] == False:
-			# hit player hands while total < hit_to target
 			for p in players:
 				for h in range(p.num_hands):
+					#check for splittable hand and split
+					if p.data[h]['cards'][0] == p.data[h]['cards'][1]:
+						if split_df[str(the_dealer.data['cards'][0])][str(p.data[h]['cards'][0])]:
+							p.data[h+1]['active'] = True
+							p.data[h+1]['cards'].append(p.data[h]['cards'].pop())
+							p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
+							p.data[h+1]['cards'], shuffled_deck, reshuffle = hit(p.data[h+1]['cards'], shuffled_deck, reshuffle)
+							p.data[h]['total'] = total(p.data[h]['cards'])
+							p.data[h+1]['total'] = total(p.data[h+1]['cards'])
+							p.data[h+1]['dealer_up_card'] = p.data[h]['dealer_up_card']
+
+			for p in players:
+				for h in range(p.num_hands):
+					# hit player hands while total < hit_to target
 					while p.data[h]['total'] < p.data[h]['hit_strategy'][dealer_up]:
 						p.data[h]['cards'], shuffled_deck, reshuffle = hit(p.data[h]['cards'], shuffled_deck, reshuffle)
 						p.data[h]['total'] = total(p.data[h]['cards'])
@@ -172,15 +198,18 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 						p.data[h]['result'] = 'push'
 				
 				# write each player's data to a dataframe
-				temp_df = pd.DataFrame.from_dict(p.data[h], orient='index').swapaxes('index','columns')
-				temp_df['round'] = round_counter
-				temp_df['hand'] = h
-				df = df.append(temp_df)
+				if p.data[h]['active'] == True:
+					temp_df = pd.DataFrame.from_dict(p.data[h], orient='index').swapaxes('index','columns')
+					temp_df['round'] = round_counter
+					temp_df['hand'] = h
+					temp_df = temp_df.drop(['active'], axis=1)
+					df = df.append(temp_df)
 		
 		# write dealer's data to dataframe
 		temp_df = pd.DataFrame.from_dict(the_dealer.data, orient='index').swapaxes('index','columns')
 		temp_df['round'] = round_counter
 		temp_df['hand'] = 0
+		temp_df = temp_df.drop(['active'], axis=1)
 		df = df.append(temp_df)
 
 		
@@ -202,9 +231,9 @@ if __name__ == "__main__":
 	cut_cards = True
 	dealer_hit_to = 17
 	# format of hit_strategies dict: {player: {dealer_up_card: player_hit_to}}
-	hit_strategies = {0: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17},
-				      1: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17},
-				      2: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17}}
+	hit_strategies = {0: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17, 11: 17},
+				      1: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17, 11: 17},
+				      2: {2: 13, 3: 13, 4: 12, 5: 12, 6: 12, 7: 12, 8: 17, 9: 17, 10: 17, 11: 17}}
 	
 
 	game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_strategies)
