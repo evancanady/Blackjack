@@ -7,9 +7,9 @@ class Player():
 	def __init__(self, name, hit_strategy):
 		self.name = name
 		# self.hit_to = hit_to
-		self.data = {0:{'active': True, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0},
-					 1:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0},
-					 2:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0}}
+		self.data = {0:{'active': True, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0, 'hand_split': False},
+					 1:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0, 'hand_split': False},
+					 2:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0, 'hand_split': False}}
 		# self.num_hands = len(self.data)
 
 	@property
@@ -23,7 +23,7 @@ class Player():
 class Dealer():
 	def __init__(self, hit_to):
 		# self.hit_to = hit_to
-		self.data = {'active': True, 'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0}
+		self.data = {'active': True, 'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0, 'hand_split': False}
 	
 def shuffle(deck_count, cut):
 	deck = [2,3,4,5,6,7,8,9,10,'J','Q','K','A'] * 4 * deck_count # four cards of each suit
@@ -167,6 +167,8 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 							p.data[h]['total'] = total(p.data[h]['cards'])
 							p.data[h+1]['total'] = total(p.data[h+1]['cards'])
 							p.data[h+1]['dealer_up_card'] = p.data[h]['dealer_up_card']
+							p.data[h]['hand_split'] = True
+							p.data[h+1]['hand_split'] = True
 
 			for p in players:
 				for h in range(p.num_hands):
