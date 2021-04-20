@@ -3,6 +3,7 @@ import random
 import pandas as pd
 import pickle
 
+# define PLayer class
 class Player():
 	def __init__(self, name, hit_strategy):
 		self.name = name
@@ -12,6 +13,7 @@ class Player():
 					 2:{'active': False, 'name': name, 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_strategy, 'dealer_up_card': 0, 'hand_split': False}}
 		# self.num_hands = len(self.data)
 
+	# calcualte the numnber of active hands for each player
 	@property
 	def num_hands(self):
 		active_count = 0
@@ -20,27 +22,32 @@ class Player():
 		return active_count
 		
 
+# define Dealer class
 class Dealer():
 	def __init__(self, hit_to):
 		# self.hit_to = hit_to
 		self.data = {'active': True, 'name': 'dealer', 'total': 0, 'result': None, 'bust': False, 'blackjack': False, 'cards': [], 'hit_strategy': hit_to, 'dealer_up_card': 0, 'hand_split': False}
 	
+# function to shuffle the deck
 def shuffle(deck_count, cut):
 	deck = [2,3,4,5,6,7,8,9,10,'J','Q','K','A'] * 4 * deck_count # four cards of each suit
 
 	random.shuffle(deck)
 
+	# if the CUT flag is true insert a CUT card randomly into the deck. Once reached while dealing it signals the need to reshuffle.
 	if cut: # if cut == True then place cut randomly in first 25-35% of deck
 		cut_placement_min = int(round(52 * deck_count * 0.25))
 		cut_placement_max = int(round(52 * deck_count * 0.35))
 		cut_placement = random.randint(cut_placement_min, cut_placement_max)
 		deck.insert(cut_placement, 'CUT')
 
+	# flip the flasg back to False on every reshuffle
 	global reshuffle
 	reshuffle = False
 
 	return deck
 
+# function to deal the cards
 def deal(shuffled_deck, players, the_dealer, reshuffle):
 	for i in range(2):
 		for p in players:
@@ -58,7 +65,7 @@ def deal(shuffled_deck, players, the_dealer, reshuffle):
 	
 	return shuffled_deck, players, the_dealer, reshuffle
 
-
+# function to hit
 def hit(hand, deck, reshuffle):
 	#print(deck) #debug
 	if deck[-1] == 'CUT': #if the next card is CUT remove it and set the reshuffle flag to True
@@ -67,6 +74,7 @@ def hit(hand, deck, reshuffle):
 	hand.append(deck.pop())
 	return hand, deck, reshuffle
 
+# check for dealer blackjack
 def blackjack_check(players, the_dealer):
 	if the_dealer.data['total'] == 21:
 		the_dealer.data['blackjack'] = True
@@ -79,6 +87,7 @@ def blackjack_check(players, the_dealer):
 					p.data[h]['blackjack'] = True
 	return players, the_dealer
 
+# calculate hand totals. This calculates A as both 1 and 11, then evaluates which to choose
 def total(hands):
 	total = [0,0]
 	for card in hands:
@@ -97,6 +106,7 @@ def total(hands):
 		return min(total[0], total[1])
 
 
+# main function for the game
 def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_strategies):
 	round_counter = 0
 	used_cards = 0
@@ -104,7 +114,7 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 	dealer_bust = False
 	df = pd.DataFrame()
 
-	# validate 
+	# validate imput from user
 	if len(hit_strategies) != num_players:
 		sys.exit('num_players must equal len(hit_strategies)')
 
@@ -116,20 +126,20 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 	shuffled_deck = shuffle(deck_count, cut_cards)
 
 
+	# play the number of desired games
 	while round_counter < num_rounds:
 		if reshuffle:
-			shuffled_deck = shuffle(deck_count, cut_cards)
+			shuffled_deck = shuffle(deck_count, cut_cards) # initiate a reshuffle if the flag is TRUE
 
 		# list to hold player objects
 		players = []
 
+		# create the players and group in a list
 		for n in range(num_players):
 			name = 'Player' + str(n+1)
 			players.append(Player(name, hit_strategies[n]))
 
-		# print(hit_strategies)
-		# print(players[0].data[0]['hit_strategy'])
-
+		# create the dealer
 		the_dealer = Dealer(dealer_hit_to)
 
 		# deal the cards
@@ -154,6 +164,7 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 		players, the_dealer = blackjack_check(players, the_dealer)
 		
 
+		# if no dealer blackjack, check for splittable hands and split if a situations meets the given criteria
 		if the_dealer.data['blackjack'] == False:
 			for p in players:
 				for h in range(p.num_hands):
@@ -170,6 +181,7 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 							p.data[h]['hand_split'] = True
 							p.data[h+1]['hand_split'] = True
 
+			# hit player hands if the situation meets the given criteria
 			for p in players:
 				for h in range(p.num_hands):
 					# hit player hands while total < hit_to target
@@ -185,6 +197,7 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 				the_dealer.data['total'] = total(the_dealer.data['cards'])
 				if the_dealer.data['total'] > 21: the_dealer.data['bust'] = True
 
+		# write the results to the player data dict's
 		for p in players:
 			for h in range(p.num_hands):
 				if the_dealer.data['blackjack'] == False:
@@ -216,11 +229,9 @@ def game(deck_count, num_players, num_rounds, cut_cards, dealer_hit_to, hit_stra
 
 		
 		round_counter += 1
-		# print(round_counter)
-		# print(shuffled_deck)
 
+	# pickle the final dataframe to be read into a Jupyter notebook for analysis
 	df.reset_index(inplace=True, drop=True)
-	# print(df.head(20))
 	outfile = open('blackjack.pickle','wb')
 	pickle.dump(df,outfile)
 	outfile.close()
